@@ -12,36 +12,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Xcode Project
-        working-directory: ios_app
-        run: xcodegen generate
-
-      - name: Build Unsigned iOS App
+      - name: Compile and Package iOS App Directly
         working-directory: ios_app
         run: |
-          xcodebuild build \
-            -project YakinlikRadari.xcodeproj \
-            -target YakinlikRadari \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build \
-            ARCHS=arm64 \
-            ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          mkdir -p Payload/YakinlikRadari.app
 
-      - name: Package IPA for Sideloadly
-        working-directory: ios_app
-        run: |
-          mkdir -p Payload
-          APP_PATH=$(find build -name "YakinlikRadari.app" -type d | head -n 1)
-          echo "Found app at: $APP_PATH"
-          cp -r "$APP_PATH" Payload/
+          echo "Compiling Swift sources for arm64-apple-ios15.0..."
+          xcrun --sdk iphoneos swiftc \
+            -target arm64-apple-ios15.0 \
+            -sdk "$SDK_PATH" \
+            -O \
+            Sources/BluetoothRadarManager.swift \
+            Sources/YakinlikRadariApp.swift \
+            -o Payload/YakinlikRadari.app/YakinlikRadari
+
+          cp Info.plist Payload/YakinlikRadari.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable YakinlikRadari" Payload/YakinlikRadari.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.yakinlikradari.ios" Payload/YakinlikRadari.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName YakinlikRadari" Payload/YakinlikRadari.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 15.0" Payload/YakinlikRadari.app/Info.plist || true
+
+          chmod +x Payload/YakinlikRadari.app/YakinlikRadari
+          codesign --force --sign - --timestamp=none Payload/YakinlikRadari.app
           zip -r YakinlikRadari_iOS.ipa Payload
 
       - name: Upload YakinlikRadari_iOS.ipa Artifact
