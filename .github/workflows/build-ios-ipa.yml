@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-ipa:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -22,20 +22,26 @@ jobs:
       - name: Build Unsigned iOS App
         working-directory: ios_app
         run: |
-          xcodebuild -project YakinlikRadari.xcodeproj \
-            -scheme YakinlikRadari \
+          xcodebuild build \
+            -project YakinlikRadari.xcodeproj \
+            -target YakinlikRadari \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Package IPA for Sideloadly
         working-directory: ios_app
         run: |
           mkdir -p Payload
-          cp -r build/Build/Products/Release-iphoneos/YakinlikRadari.app Payload/
+          APP_PATH=$(find build -name "YakinlikRadari.app" -type d | head -n 1)
+          echo "Found app at: $APP_PATH"
+          cp -r "$APP_PATH" Payload/
           zip -r YakinlikRadari_iOS.ipa Payload
 
       - name: Upload YakinlikRadari_iOS.ipa Artifact
