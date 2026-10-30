@@ -1,0 +1,45 @@
+name: Build iOS IPA (Sideloadly)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        working-directory: ios_app
+        run: xcodegen generate
+
+      - name: Build Unsigned iOS App
+        working-directory: ios_app
+        run: |
+          xcodebuild -project YakinlikRadari.xcodeproj \
+            -scheme YakinlikRadari \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package IPA for Sideloadly
+        working-directory: ios_app
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/YakinlikRadari.app Payload/
+          zip -r YakinlikRadari_iOS.ipa Payload
+
+      - name: Upload YakinlikRadari_iOS.ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YakinlikRadari_iOS_IPA
+          path: ios_app/YakinlikRadari_iOS.ipa
